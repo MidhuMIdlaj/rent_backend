@@ -22,6 +22,9 @@ import { StripeService } from "../services/stripe.service";
 import { CreateCheckoutSessionUseCase } from "../../application/usecase/payment/create-checkout-session-usecase";
 import { HandleWebhookUseCase } from "../../application/usecase/payment/handle-webhook-usecase";
 import { PaymentController } from "../../interface/controllers/payment-controller";
+import { UnitUseCases } from "../../application/usecase/unit/unit-usecase";
+import { UnitController } from "../../interface/controllers/unit-controller";
+import { UnitRepository } from "../repository/unit-repository";
 
 // ─── Repositories ──────────────────────────────────────────────────────────────
 const userRepository = new UserRepository();
@@ -29,6 +32,7 @@ const tenantRepository = new TenantRepository();
 const documentRepository = new DocumentRepository();
 const agreementRepository = new AgreementRepository();
 const subscriptionRepository = new SubscriptionRepository();
+const unitRepository = new UnitRepository();
 
 // ─── Services ─────────────────────────────────────────────────────────────────
 const jwtService = new JwtService();
@@ -52,6 +56,7 @@ const agreementUseCases = new AgreementUseCases(
 );
 const createCheckoutSessionUseCase = new CreateCheckoutSessionUseCase(stripeService, userRepository, subscriptionRepository);
 const handleWebhookUseCase = new HandleWebhookUseCase(stripeService, userRepository, subscriptionRepository, emailService);
+const unitUseCases = new UnitUseCases(unitRepository);
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 export const authController = new AuthController(authUseCases, registerUseCase);
@@ -60,3 +65,4 @@ export const tenantController = new TenantController(tenantUseCases);
 export const documentController = new DocumentController(documentUseCases);
 export const agreementController = new AgreementController(agreementUseCases);
 export const paymentController = new PaymentController(createCheckoutSessionUseCase, handleWebhookUseCase);
+export const unitController = new UnitController(unitUseCases);

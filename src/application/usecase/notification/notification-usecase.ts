@@ -1,20 +1,30 @@
-import { logger } from '../../../shared/logger/logger';
-import { Notification, NotificationType, NotificationChannel } from '../../../domain/entities/Notification';
-import { INotificationRepository } from '../../../domain/repository/notification-repository';
-import { INotificationUseCase, SendMultiChannelNotificationDTO } from '../../interface/common/notification-usecase.impl';
-import { IEmailService } from '../../interface/common/email-service-usecase.impl';
-import { ISmsService } from '../../interface/common/sms-service.interface';
-import { IUserRepository } from '../../../domain/repository/user-repository-impl';
+import { logger } from "../../../shared/logger/logger";
+import {
+  Notification,
+  NotificationType,
+  NotificationChannel,
+} from "../../../domain/entities/Notification";
+import { INotificationRepository } from "../../../domain/repository/notification-repository.interface";
+import {
+  INotificationUseCase,
+  SendMultiChannelNotificationDTO,
+} from "../../interface/common/notification-usecase.interface";
+import { IEmailService } from "../../interface/common/email-service-usecase.interface";
+import { ISmsService } from "../../interface/common/sms-service.interface";
+import { IUserRepository } from "../../../domain/repository/user-repository.interface";
 
 export class NotificationUseCase implements INotificationUseCase {
   constructor(
     private notificationRepository: INotificationRepository,
     private emailService: IEmailService,
     private smsService: ISmsService,
-    private userRepository: IUserRepository
+    private userRepository: IUserRepository,
   ) {}
 
-  async getUserNotifications(userId: string, role?: string): Promise<Notification[]> {
+  async getUserNotifications(
+    userId: string,
+    role?: string,
+  ): Promise<Notification[]> {
     return this.notificationRepository.findByUserId(userId, role);
   }
 
@@ -39,7 +49,9 @@ export class NotificationUseCase implements INotificationUseCase {
       channel = NotificationChannel.IN_APP,
       buildingId,
       tenantId,
-    } = data as any;
+      link,
+      metadata,
+    } = data;
 
     const promises: Promise<any>[] = [];
 
@@ -52,7 +64,8 @@ export class NotificationUseCase implements INotificationUseCase {
         channel,
         buildingId,
         tenantId,
-      })
+        metadata: link ? { ...(metadata ?? {}), link } : metadata,
+      }),
     );
 
     if (
@@ -62,18 +75,26 @@ export class NotificationUseCase implements INotificationUseCase {
     ) {
       const user = await this.userRepository.findById(userId);
       if (user) {
-        if (channel === NotificationChannel.EMAIL && user.email && this.emailService.sendNotificationEmail) {
+        if (
+          channel === NotificationChannel.EMAIL &&
+          user.email &&
+          this.emailService.sendNotificationEmail
+        ) {
           promises.push(
-            this.emailService.sendNotificationEmail(user.email, title, message).catch(err => {
-              logger.error('Failed to send email notification:', err);
-            })
+            this.emailService
+              .sendNotificationEmail(user.email, title, message)
+              .catch((err) => {
+                logger.error("Failed to send email notification:", err);
+              }),
           );
         }
         if (channel === NotificationChannel.SMS && user.phone_number) {
           promises.push(
-            this.smsService.sendSms(user.phone_number, `[${title}]: ${message}`).catch(err => {
-              logger.error('Failed to send SMS notification:', err);
-            })
+            this.smsService
+              .sendSms(user.phone_number, `[${title}]: ${message}`)
+              .catch((err) => {
+                logger.error("Failed to send SMS notification:", err);
+              }),
           );
         }
       }

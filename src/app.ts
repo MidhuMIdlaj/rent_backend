@@ -1,4 +1,4 @@
-import { env } from './infrastructure/config/env';
+import { env } from "./infrastructure/config/env";
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -28,6 +28,11 @@ import {
   uploadController,
   subscriptionController,
   paymentRecordController,
+  bookingController,
+  tenantPortalController,
+  offerController,
+  payoutController,
+  reservedTenantController,
 } from "./infrastructure/DIContainer";
 import { createAgreementRouter } from "./interface/routers/agreement-router";
 import { createPaymentRouter } from "./interface/routers/payment-router";
@@ -47,16 +52,43 @@ import { createPublicRouter } from "./interface/routers/public-router";
 import { createUploadRouter } from "./interface/routers/upload-router";
 import { createSubscriptionRouter } from "./interface/routers/subscription-router";
 import { createPaymentRecordRouter } from "./interface/routers/payment-record-router";
+import { createBookingRouter } from "./interface/routers/booking-router";
+import { createTenantPortalRouter } from "./interface/routers/tenant-portal-router";
+import { createOfferRouter } from "./interface/routers/offer-router";
+import { createPayoutRouter } from "./interface/routers/payout-router";
+import { createReservedTenantRouter } from "./interface/routers/reserved-tenant-router";
 
 const createApp = (): Application => {
   const app = express();
   app.use(morgan("dev"));
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+  const allowedOrigins = [
+    env.APP_URL,
+    env.FRONTEND_URL,
+    "https://roomport.noxwing.site",
+    "http://roomport.noxwing.site",
+    "http://localhost:3000",
+    "http://localhost:5173",
+  ]
+    .filter(Boolean)
+    .map((url) => url.replace(/\/$/, ""));
+
   app.use(
     cors({
-      origin: env.APP_URL ?? "http://localhost:3000",
+      origin: (requestOrigin, callback) => {
+        if (!requestOrigin) return callback(null, true);
+        const normalized = requestOrigin.replace(/\/$/, "");
+        if (
+          allowedOrigins.includes(normalized) ||
+          normalized.endsWith(".noxwing.site") ||
+          normalized.includes("localhost")
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
-      methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
     }),
   );
@@ -87,22 +119,25 @@ const createApp = (): Application => {
     "/api/v1/payments/webhook",
     express.raw({ type: "application/json" }),
   );
+  // Razorpay webhook needs raw body
+  app.use(
+    "/api/v1/bookings/webhook",
+    express.raw({ type: "application/json" }),
+  );
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
   // app.use(globalLimiter);
 
   app.get("/health", (_req: Request, res: Response) => {
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Brift API is running 🚀",
-        environment: env.NODE_ENV,
-        timestamp: new Date().toISOString(),
-      });
+    res.status(200).json({
+      success: true,
+      message: "Brift API is running 🚀",
+      environment: env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+    });
   });
 
-  app.use("/api/v1/auth", authLimiter, authRoutes);
+  app.use("/api/v1/auth", authRoutes);
   app.use("/api/v1/system", systemRoutes);
   app.use("/api/v1/tenants", createTenantRouter(tenantController));
   app.use("/api/v1/documents", createDocumentRouter(documentController));
@@ -130,6 +165,17 @@ const createApp = (): Application => {
   app.use(
     "/api/v1/payment-records",
     createPaymentRecordRouter(paymentRecordController),
+  );
+  app.use("/api/v1/bookings", createBookingRouter(bookingController));
+  app.use(
+    "/api/v1/tenant-portal",
+    createTenantPortalRouter(tenantPortalController),
+  );
+  app.use("/api/v1/offers", createOfferRouter(offerController));
+  app.use("/api/v1/payouts", createPayoutRouter(payoutController));
+  app.use(
+    "/api/v1/reserved-tenants",
+    createReservedTenantRouter(reservedTenantController),
   );
 
   app.use((_req: Request, res: Response) =>
